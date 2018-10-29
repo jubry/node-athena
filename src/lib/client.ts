@@ -21,6 +21,7 @@ export interface AthenaClientConfig extends AthenaRequestConfig {
   queryTimeout?: number
   concurrentExecMax?: number
   execRightCheckInterval?: number
+  noResultExpected?: boolean
 }
 
 const defaultPollingInterval = 1000
@@ -157,7 +158,7 @@ export class AthenaClient {
       }
 
       // Wait for timeout or query success
-      while (!isTimeout && !await this.request.checkQuery(queryId, config)) {
+      while (!isTimeout && !(await this.request.checkQuery(queryId, config))) {
         await util.sleep(config.pollingInterval || defaultPollingInterval)
       }
 
@@ -187,10 +188,13 @@ export class AthenaClient {
       ) {
         throw new Error('query outputlocation is empty')
       }
-      const resultsStream = this.request.getResultsStream(
-        queryExecution.ResultConfiguration.OutputLocation,
-      )
-      resultsStream.pipe(csvTransform)
+
+      if (!config.noResultExpected) {
+        const resultsStream = this.request.getResultsStream(
+          queryExecution.ResultConfiguration.OutputLocation,
+        )
+        resultsStream.pipe(csvTransform)
+      }
     } catch (err) {
       csvTransform.emit('error', err)
       return
